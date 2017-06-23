@@ -4,19 +4,67 @@ provider "aws" {
     region          = "${var.region}"
 }
 
-resource "aws_instance" "example" {
-    ami             = "ami-704e5814"
-    instance_type   = "t2.micro"
+resource "aws_sns_topic" "dispatcher_topic" {
+    name            = "${var.dispatcher_topic}"
+}
 
-    provisioner "local-exec" {
-        command     = "echo ${aws_instance.example.public_ip} > ip_address.txt"
+output "dispatcher_topic_arn" {
+    value           = "${aws_sns_topic.dispatcher_topic.arn}"
+}
+
+resource "aws_sns_topic" "events_topic" {
+    name            = "${var.events_topic}"
+}
+
+output "events_topic_arn" {
+    value           = "${aws_sns_topic.events_topic.arn}"
+}
+
+resource "aws_sqs_queue" "referrals_queue" {
+    name            = "${var.referrals_queue}"
+    redrive_policy  = "{\"deadLetterTargetArn\":\"${aws_sqs_queue.referrals_queue_deadletter.arn}\",\"maxReceiveCount\":3}"
+}
+
+output "referrals_queue_id" {
+    value           = "${aws_sqs_queue.referrals_queue.id}"
+}
+
+output "referrals_queue_arn" {
+    value           = "${aws_sqs_queue.referrals_queue.arn}"
+}
+
+resource "aws_sqs_queue_policy" "referrals_queue_policy" {
+    queue_url       = "${aws_sqs_queue.referrals_queue.id}"
+    policy          = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Id": "${aws_sqs_queue.referrals_queue.arn}/SQSDefaultPolicy",
+  "Statement": [
+    {
+      "Sid": "First",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": "SQS:SendMessage",
+      "Resource": "${aws_sqs_queue.referrals_queue.arn}",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "${aws_sns_topic.dispatcher_topic.arn}"
+        }
+      }
     }
+  ]
+}
+POLICY
 }
 
-resource "aws_eip" "ip" {
-    instance        = "${aws_instance.example.id}"
+resource "aws_sqs_queue" "referrals_queue_deadletter" {
+    name            = "${var.referrals_queue}_deadletter"
 }
 
-output "ip" {
-    value           = "${aws_eip.ip.public_ip}"
+resource "aws_sns_topic_subscription" "dispatch_topic_referrals_queue_subscription" {
+    topic_arn       = "${aws_sns_topic.dispatcher_topic.arn}"
+    protocol        = "sqs"
+    endpoint        = "${aws_sqs_queue.referrals_queue.arn}"
 }
