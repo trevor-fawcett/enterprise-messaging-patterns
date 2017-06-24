@@ -6,7 +6,7 @@ Then use the following to specify the variables file when applying (as in this c
 ````
 terraform apply -var-file="../../terraform.tfvars"
 ````
-If you want to try this project yourself, you'll need a file in the parent folder of this repository called "terraform.tfvars" with the following contents.
+If you want to try this project yourself, you'll need a file in the parent folder to this repository called "terraform.tfvars" with the following contents.
 Simply swap out the place-holders for values pertaining to your AWS account.
 ````
 access_key = "YOUR_AWS_ACCESS_KEY"
