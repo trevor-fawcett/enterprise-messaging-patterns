@@ -5,66 +5,45 @@ provider "aws" {
 }
 
 resource "aws_sns_topic" "dispatcher_topic" {
-    name            = "${var.dispatcher_topic}"
-}
-
-output "dispatcher_topic_arn" {
-    value           = "${aws_sns_topic.dispatcher_topic.arn}"
+    name            = "dispatcher"
 }
 
 resource "aws_sns_topic" "events_topic" {
-    name            = "${var.events_topic}"
+    name            = "events"
 }
 
-output "events_topic_arn" {
-    value           = "${aws_sns_topic.events_topic.arn}"
+module "referrals_queue" {
+    source          = "./queue"
+    name            = "referrals"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
 
-resource "aws_sqs_queue" "referrals_queue" {
-    name            = "${var.referrals_queue}"
-    redrive_policy  = "{\"deadLetterTargetArn\":\"${aws_sqs_queue.referrals_queue_deadletter.arn}\",\"maxReceiveCount\":3}"
+module "clients_queue" {
+    source          = "./queue"
+    name            = "clients"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
 
-output "referrals_queue_id" {
-    value           = "${aws_sqs_queue.referrals_queue.id}"
+module "cases_queue" {
+    source          = "./queue"
+    name            = "cases"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
 
-output "referrals_queue_arn" {
-    value           = "${aws_sqs_queue.referrals_queue.arn}"
+module "networks_queue" {
+    source          = "./queue"
+    name            = "networks"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
 
-resource "aws_sqs_queue_policy" "referrals_queue_policy" {
-    queue_url       = "${aws_sqs_queue.referrals_queue.id}"
-    policy          = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Id": "${aws_sqs_queue.referrals_queue.arn}/SQSDefaultPolicy",
-  "Statement": [
-    {
-      "Sid": "First",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "*"
-      },
-      "Action": "SQS:SendMessage",
-      "Resource": "${aws_sqs_queue.referrals_queue.arn}",
-      "Condition": {
-        "ArnEquals": {
-          "aws:SourceArn": "${aws_sns_topic.dispatcher_topic.arn}"
-        }
-      }
-    }
-  ]
-}
-POLICY
+module "members_queue" {
+    source          = "./queue"
+    name            = "members"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
 
-resource "aws_sqs_queue" "referrals_queue_deadletter" {
-    name            = "${var.referrals_queue}_deadletter"
-}
-
-resource "aws_sns_topic_subscription" "dispatch_topic_referrals_queue_subscription" {
-    topic_arn       = "${aws_sns_topic.dispatcher_topic.arn}"
-    protocol        = "sqs"
-    endpoint        = "${aws_sqs_queue.referrals_queue.arn}"
+module "communications_queue" {
+    source          = "./queue"
+    name            = "communications"
+    topic           = "${aws_sns_topic.dispatcher_topic.arn}"
 }
